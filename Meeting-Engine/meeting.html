@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  <title>AI Meeting Buddy - Room</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    html,
+    body {
+      height: 100dvh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #202124;
+      /* Google Meet Dark Background */
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    }
+
+    /* --- THE GOOGLE MEET DYNAMIC GRID --- */
+    .meet-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-content: center;
+      gap: 0.75rem;
+      height: 100%;
+      width: 100%;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+
+    /* ─── PARTICIPANT CARD ─────────────────────────────────────────────
+       The card itself is a black canvas. The video sits inside it and
+       shrinks-to-fit (contain), so the black canvas shows through as
+       letterbox / pillarbox bars — exactly like Google Meet / Teams.
+    ──────────────────────────────────────────────────────────────────── */
+    .video-container {
+      flex: 1 1 calc(33.333% - 1rem);
+      min-width: 280px;
+      max-width: 100%;
+      max-height: calc(100dvh - 120px);
+      aspect-ratio: 16 / 9;
+
+      /* Black canvas — this IS the letterbox/pillarbox fill */
+      background-color: #000;
+      border-radius: 0.75rem;
+
+      /* overflow:hidden keeps rounded corners clean */
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      transition: all 0.4s ease-in-out;
+    }
+
+    /* ─── VIDEO ELEMENT ────────────────────────────────────────────────
+       object-fit:contain  →  never crops, zooms to fit, black bars fill.
+       background:black    →  redundant safety net on the video itself.
+       display:block       →  removes the 4px inline gap browsers add.
+    ──────────────────────────────────────────────────────────────────── */
+    .video-container video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;     /* ← THE KEY: zoom-to-fit, never crop */
+      background-color: #000;  /* black bars = container bg shows through */
+    }
+
+    /* ─── SCREENSHARE CARD (same rule, made explicit) ─────────────────
+       Screen content is often 16:9 but can be ultrawide or portrait —
+       contain handles all cases gracefully.
+    ──────────────────────────────────────────────────────────────────── */
+    .is-screenshare {
+      background-color: #000;
+    }
+
+    /* --- SPOTLIGHT LAYOUT (ACTIVATES DURING SCREENSHARE) --- */
+    .meet-grid.has-screenshare {
+      align-content: flex-start;
+      align-items: flex-start;
+    }
+
+    /* ─── SCREENSHARE: DOMINANT CARD ──────────────────────────────────
+       Takes the full top row. The video inside uses contain so it
+       will never overflow or crop — black bars fill any gap.
+    ──────────────────────────────────────────────────────────────────── */
+    .video-container.is-screenshare {
+      flex: 1 1 100%;
+      max-width: 100%;
+      /* Height calculation: viewport minus the thumbnail strip (~160px) minus grid gap */
+      height: calc(100dvh - 200px);
+      max-height: calc(100dvh - 200px);
+      aspect-ratio: unset;   /* let height drive the card, not aspect-ratio */
+      order: -1;
+      border: 2px solid #8ab4f8;
+      border-radius: 0.75rem;
+      background-color: #000;
+    }
+
+    /* ─── SCREENSHARE: THUMBNAIL STRIP ───────────────────────────────
+       All participant cameras shrink to a neat bottom strip.
+       Fixed dimensions ensure a clean 16:9 thumbnail look.
+    ──────────────────────────────────────────────────────────────────── */
+    .meet-grid.has-screenshare .video-container:not(.is-screenshare) {
+      flex: 0 0 auto;
+      width: 213px;           /* 213×120 = exact 16:9 thumbnail */
+      height: 120px;
+      aspect-ratio: unset;
+      min-width: unset;
+      max-height: unset;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 0.5rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    .is-speaking {
+      box-shadow: 0 0 0 4px #8ab4f8;
+      /* Google Meet blue active speaker ring */
+      transition: box-shadow 0.2s ease-in-out;
+    }
+
+    .video-status-overlay {
+      display: none;
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background-color: rgba(32, 33, 36, 0.6);
+      padding: 0.5rem;
+      border-radius: 50%;
+      backdrop-filter: blur(4px);
+    }
+
+    .is-muted .video-status-overlay.mute-indicator,
+    .camera-off .video-status-overlay.camera-indicator {
+      display: block;
+    }
+
+    .loading-spinner {
+      border: 3px solid rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      border-top: 3px solid #8ab4f8;
+      width: 32px;
+      height: 32px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.5);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(107, 114, 128, 0.8);
+    }
+
+    /* Desktop Sidebar Shrink Animation */
+    @media (min-width: 768px) {
+      .sidebar-desktop-closed {
+        width: 0 !important;
+        min-width: 0 !important;
+        border-left-width: 0 !important;
+        opacity: 0;
+      }
+    }
+
+    /* --- LOBBY WAITING SCREEN --- */
+    @keyframes pulse-ring {
+      0%   { transform: scale(1);   opacity: 0.6; }
+      70%  { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+    .lobby-pulse::before,
+    .lobby-pulse::after {
+      content: '';
+      position: absolute;
+      inset: -8px;
+      border-radius: 50%;
+      border: 2px solid #8ab4f8;
+      animation: pulse-ring 2s cubic-bezier(0.4,0,0.6,1) infinite;
+    }
+    .lobby-pulse::after { animation-delay: 1s; }
+
+    @keyframes bounce-dot {
+      0%, 80%, 100% { transform: scale(0); opacity: 0; }
+      40%            { transform: scale(1); opacity: 1; }
+    }
+    .bounce-dot { animation: bounce-dot 1.4s ease-in-out infinite; }
+    .bounce-dot:nth-child(2) { animation-delay: 0.2s; }
+    .bounce-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Lobby admit card slide-in */
+    @keyframes slide-in-right {
+      from { transform: translateX(100%); opacity: 0; }
+      to   { transform: translateX(0);    opacity: 1; }
+    }
+    .lobby-card-enter { animation: slide-in-right 0.3s ease-out forwards; }
+
+  </style>
+</head>
+
+<body class="text-slate-100 flex flex-col">
+
+  <div id="sidebarOverlay"
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] hidden opacity-0 transition-opacity duration-300 md:hidden">
+  </div>
+
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <section class="flex-1 flex flex-col relative">
+
+      <div class="flex-1 overflow-y-auto pb-20 md:pb-24">
+        <div class="meet-grid">
+
+          <div id="local-video-container" class="video-container group">
+            <div id="camera-loading"
+              class="absolute inset-0 flex flex-col items-center justify-center bg-[#202124] text-slate-300 text-sm gap-3 z-10">
+              <div class="loading-spinner"></div>
+              <p>Starting camera...</p>
+            </div>
+            <video id="localVideo" autoplay playsinline muted></video>
+
+            <div id="local-user-label" class="absolute bottom-3 left-3 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-md text-xs font-medium text-white shadow-sm flex items-center gap-2 z-10">
+              You
+            </div>
+
+            <div class="video-status-overlay mute-indicator bg-rose-500 text-white shadow-lg shadow-rose-500/20">
+              <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 14q.825 0 1.413-.588T14 12V6q0-.825-.588-1.413T12 4q-.825 0-1.413.588T10 6v6q0 .825.588 1.413T12 14Zm-1 7v-3.075q-2.6-.35-4.3-2.325T5 11H7q0 2.075 1.463 3.538T12 16q2.075 0 3.538-1.463T17 11h2q0 2.5-1.7 4.475T13 17.925V21h-2Zm1-6q.425 0 .713-.288T13 12V6q0-.425-.288-.713T12 5q-.425 0-.713.288T11 6v6q0 .425.288.713T12 8Z" />
+              </svg>
+            </div>
+            <div class="video-status-overlay camera-indicator top-14">
+              <svg class="size-4 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l2.29 2.29c.63.63 1.71.18 1.71-.71V8.91c0-.89-1.08-1.34-1.71-.71L17 10.5zM15 16H5V8h10v8zM2 2.27L4.28 4.55l-1.73 1.73L1 7.83V19c0 .55.45 1 1 1h13.17l2.55 2.55L18.27 24l-16-16L2.27 2z" />
+              </svg>
+            </div>
+          </div>
+
+          <div id="remote-videos" class="contents"></div>
+
+        </div>
+      </div>
+
+      <div id="controlBar" class="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-30 w-[90%] md:w-auto max-w-sm md:max-w-max flex justify-center transition-all duration-500 ease-in-out">
+        <div class="bg-[#3c4043]/95 backdrop-blur-xl border border-white/10 px-4 py-2 rounded-2xl shadow-2xl flex items-center justify-center gap-2 w-full md:w-auto">
+
+          <button id="muteBtn" class="p-3.5 rounded-full bg-[#3c4043] hover:bg-white/10 text-white transition-all outline-none flex justify-center shadow-sm border border-white/5" title="Toggle Microphone">
+            <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14q.825 0 1.413-.588T14 12V6q0-.825-.588-1.413T12 4q-.825 0-1.413.588T10 6v6q0 .825.588 1.413T12 14Zm-1 7v-3.075q-2.6-.35-4.3-2.325T5 11H7q0 2.075 1.463 3.538T12 16q2.075 0 3.538-1.463T17 11h2q0 2.5-1.7 4.475T13 17.925V21h-2Zm1-6q.425 0 .713-.288T13 12V6q0-.425-.288-.713T12 5q-.425 0-.713.288T11 6v6q0 .425.288.713T12 8Z" /></svg>
+          </button>
+          <button id="cameraBtn" class="p-3.5 rounded-full bg-[#3c4043] hover:bg-white/10 text-white transition-all outline-none flex justify-center shadow-sm border border-white/5" title="Toggle Camera">
+            <svg class="size-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l2.29 2.29c.63.63 1.71.18 1.71-.71V8.91c0-.89-1.08-1.34-1.71-.71L17 10.5zM15 16H5V8h10v8z" /></svg>
+          </button>
+          <button id="screenShareBtn" class="p-3.5 rounded-full bg-[#3c4043] hover:bg-white/10 text-white transition-all outline-none flex justify-center shadow-sm border border-white/5" title="Share Screen">
+            <svg class="size-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" /></svg>
+          </button>
+
+          <div class="w-px h-8 bg-white/10 mx-1"></div> <div class="relative">
+            <button id="emojiMenuBtn" class="p-3.5 rounded-full bg-[#3c4043] hover:bg-white/10 text-white transition-all outline-none flex justify-center shadow-sm border border-white/5" title="React">
+              <svg class="size-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" /></svg>
+            </button>
+            <div id="emojiDropdown" class="hidden absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-[#28292c] border border-white/10 rounded-full shadow-2xl px-4 py-2 items-center gap-2" style="display:none;">
+              <button class="emoji-reaction text-2xl hover:scale-125 transition-transform origin-bottom" data-emoji="👍">👍</button>
+              <button class="emoji-reaction text-2xl hover:scale-125 transition-transform origin-bottom" data-emoji="👏">👏</button>
+              <button class="emoji-reaction text-2xl hover:scale-125 transition-transform origin-bottom" data-emoji="❤️">❤️</button>
+              <button class="emoji-reaction text-2xl hover:scale-125 transition-transform origin-bottom" data-emoji="😂">😂</button>
+              <button class="emoji-reaction text-2xl hover:scale-125 transition-transform origin-bottom" data-emoji="🎉">🎉</button>
+            </div>
+          </div>
+          <div class="relative">
+            <button id="moreOptionsBtn" class="p-3.5 rounded-full bg-[#3c4043] hover:bg-white/10 text-white transition-all outline-none flex justify-center shadow-sm border border-white/5" title="More Options">
+              <svg class="size-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 12.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5ZM12 18.75a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" /></svg>
+            </button>
+            
+            <div id="moreOptionsMenu" class="hidden absolute bottom-full mb-4 right-0 md:left-1/2 md:-translate-x-1/2 bg-[#28292c] border border-white/10 rounded-lg shadow-2xl py-2 w-56 flex-col z-50">
+               <button class="menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelChat" data-title="Meeting Chat">Meeting Chat</button>
+               <button class="menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelDetails" data-title="Meeting Info">Meeting Info</button>
+               <button class="menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelParticipants" data-title="Participants">Participants</button>
+               <button class="menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelAi" data-title="Engagement Analyzer">Engagement Analyzer</button>
+               <button id="lobbyMenuBtn" class="hidden menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelLobby" data-title="Waiting Lobby">
+                 Waiting Lobby
+                 <span id="lobbyBadge" class="hidden ml-auto bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">0</span>
+               </button>
+               <div class="h-px bg-white/5 my-1 mx-2"></div>
+               <button id="settingsMenuBtn" class="hidden menu-tab-btn flex items-center gap-3 px-4 py-2.5 hover:bg-[#3c4043] w-full text-left text-sm text-slate-200 transition-colors" data-target="panelSettings" data-title="Meeting Settings">
+                 <svg class="size-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                 Settings
+               </button>
+            </div>
+          </div>
+
+          <div class="w-px h-8 bg-white/10 mx-1"></div> <button id="leaveBtn" class="px-6 py-3.5 rounded-full bg-[#ea4335] hover:bg-[#d93025] text-white font-semibold text-sm transition-all shadow-lg outline-none flex items-center justify-center gap-2">
+            <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+<aside id="rightSidebar" class="fixed inset-y-0 right-0 z-50 w-80 md:w-80 lg:w-96 bg-[#202124] border-l border-white/10 flex flex-col shrink-0 transform transition-all duration-300 translate-x-full md:relative md:translate-x-0 shadow-2xl md:shadow-none overflow-hidden sidebar-desktop-closed">      
+      <div class="border-b border-white/10 shrink-0 bg-[#28292c] p-4 flex items-center justify-between">
+        <h2 id="sidebarTitle" class="text-base font-semibold text-white tracking-wide truncate">AI Tools & Engagement</h2>
+        <button id="closeSidebarBtn" class="p-2 -mr-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-full transition-colors outline-none" title="Close Sidebar">
+          <svg class="size-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-hidden relative">
+        <div id="panelAi" class="absolute inset-0 overflow-y-auto p-5 space-y-6 bg-[#202124]">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Engagement Level</span>
+            </div>
+            <div class="bg-[#3c4043] border border-white/5 rounded-xl p-4 text-center">
+              <div id="engagementScore" class="text-2xl font-bold text-[#8ab4f8]">0%</div>
+              <p class="text-[10px] text-slate-400 mt-1 uppercase font-medium">Face Detection Score</p>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+              <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              Meeting Notes
+            </h3>
+            <textarea id="notesInput" class="w-full h-28 text-sm p-3 rounded-xl border border-white/10 bg-[#303134] text-white focus:border-[#8ab4f8] focus:ring-1 focus:ring-[#8ab4f8] outline-none resize-none placeholder:text-slate-500" placeholder="- Discussed roadmap...&#10;- Next steps..."></textarea>
+            <button id="generateSummaryBtn" class="w-full py-2.5 bg-[#8ab4f8] hover:bg-[#aecbfa] text-slate-900 rounded-xl text-sm font-bold transition-all shadow-sm">Generate AI Summary</button>
+            <div id="summary-box" class="mt-2 p-4 text-sm text-slate-300 bg-[#303134] rounded-xl border border-white/5 min-h-[100px]">
+              <span class="italic text-slate-500 text-xs">AI summary will generate here...</span>
+            </div>
+          </div>
+        </div>
+
+        <div id="panelChat" class="hidden absolute inset-0 flex flex-col bg-[#202124]">
+          <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="text-center text-xs text-slate-500 my-2">Welcome to the meeting chat!</div>
+          </div>
+          <div class="p-4 bg-[#28292c] border-t border-white/5 shrink-0">
+            <div class="flex gap-2">
+              <input type="text" id="chatInput" class="flex-1 bg-[#3c4043] border border-white/10 text-white text-sm rounded-full px-4 py-2.5 outline-none focus:border-[#8ab4f8] placeholder:text-slate-500">
+              <button id="sendChatBtn" class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-slate-900 p-2.5 rounded-full transition-colors shrink-0">
+                <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="panelParticipants" class="hidden absolute inset-0 overflow-y-auto p-5 bg-[#202124]">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">In this meeting</h3>
+
+          <!-- Host-only global controls (hidden for participants) -->
+          <div id="hostParticipantControls" class="hidden mb-4 flex flex-col gap-2">
+            <div class="flex gap-2">
+              <button id="muteAllBtn"
+                class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-[#28292c] hover:bg-rose-500/10 hover:border-rose-500/30 border border-white/10 text-slate-300 hover:text-rose-400 text-xs font-semibold transition-all">
+                <!-- Mute icon -->
+                <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/>
+                </svg>
+                Mute All
+              </button>
+              <button id="cameraOffAllBtn"
+                class="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-[#28292c] hover:bg-rose-500/10 hover:border-rose-500/30 border border-white/10 text-slate-300 hover:text-rose-400 text-xs font-semibold transition-all">
+                <!-- Camera off icon -->
+                <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M12 18.75H4.5a2.25 2.25 0 0 1-2.25-2.25V9m12.841 9.091L16.5 19.5m-1.409-1.409c.407-.407.659-.97.659-1.591v-9a2.25 2.25 0 0 0-2.25-2.25h-9c-.621 0-1.184.252-1.591.659m12.182 12.182L2.909 5.909M1.5 4.5l1.409 1.409"/>
+                </svg>
+                Camera Off All
+              </button>
+            </div>
+            <div class="h-px bg-white/5"></div>
+          </div>
+
+          <div id="participantsList" class="flex flex-col gap-2">
+          </div>
+        </div>
+
+
+        <!-- ── LOBBY PANEL (host only) ──────────────────────────────── -->
+        <div id="panelLobby" class="hidden absolute inset-0 overflow-y-auto p-5 bg-[#202124]">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="p-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <svg class="size-4 text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+            </div>
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Waiting Lobby</h3>
+          </div>
+          <div id="lobbyList" class="flex flex-col gap-3">
+            <div id="lobbyEmptyState" class="text-center py-8">
+              <div class="size-12 rounded-full bg-[#3c4043] flex items-center justify-center mx-auto mb-3">
+                <svg class="size-6 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z" /></svg>
+              </div>
+              <p class="text-sm text-slate-500">No one waiting</p>
+              <p class="text-xs text-slate-600 mt-1">Participants will appear here</p>
+            </div>
+          </div>
+          <!-- Admit All button -->
+          <div id="admitAllWrapper" class="hidden mt-4">
+            <button id="admitAllBtn" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 text-sm font-bold transition-colors shadow-sm">
+              Admit All
+            </button>
+          </div>
+        </div>
+
+        <div id="panelDetails" class="hidden absolute inset-0 overflow-y-auto p-5 bg-[#202124]">
+          <div class="mb-6">
+            <h3 class="text-xl font-bold text-white mb-2" id="detailsMeetingName">Meeting Name</h3>
+            <p class="text-sm text-slate-400" id="detailsMeetingDesc">No description provided.</p>
+          </div>
+          <div class="bg-[#3c4043] p-4 rounded-xl border border-white/5 space-y-4">
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1.5">Meeting ID</div>
+              <div class="text-sm text-white font-mono bg-[#28292c] py-2 px-3 rounded-md select-all" id="detailsMeetingId">Loading...</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1.5">Shareable Link</div>
+              <div class="flex flex-col gap-2">
+                <input type="text" id="detailsJoinLink" readonly class="w-full bg-[#28292c] border border-white/10 text-white text-xs rounded-md px-3 py-2 outline-none">
+                <button id="copyLinkBtn" class="w-full bg-[#8ab4f8] text-slate-900 py-2 rounded-md text-sm font-bold hover:bg-[#aecbfa] transition-colors shadow-sm">Copy Meeting Link</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SETTINGS PANEL (host only) ─────────────────────────────── -->
+        <div id="panelSettings" class="hidden absolute inset-0 overflow-y-auto p-5 bg-[#202124]">
+
+          <!-- Header -->
+          <div class="flex items-center gap-2 mb-6">
+            <div class="p-1.5 rounded-lg bg-[#8ab4f8]/10 border border-[#8ab4f8]/20">
+              <svg class="size-4 text-[#8ab4f8]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+            </div>
+            <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Meeting Settings</h3>
+          </div>
+
+          <!-- Section: Access Control -->
+          <div class="mb-2">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Access Control</p>
+
+            <!-- Admit Users Toggle Card -->
+            <div class="bg-[#28292c] border border-white/10 rounded-xl p-4">
+              <div class="flex items-center justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-0.5">
+                    <svg class="size-4 text-[#8ab4f8] shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 0 1 21.75 8.25Z" /></svg>
+                    <p class="text-sm font-semibold text-white">Admit Users</p>
+                  </div>
+                  <p class="text-xs text-slate-500 leading-snug">Participants must wait for host approval before joining.</p>
+                </div>
+
+                <!-- Toggle Switch -->
+                <button id="admitToggleBtn" role="switch" aria-checked="true"
+                  class="relative shrink-0 w-11 h-6 rounded-full transition-colors duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8ab4f8] bg-[#8ab4f8]"
+                  title="Toggle admit users">
+                  <span id="admitToggleThumb"
+                    class="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-md transform transition-transform duration-300 translate-x-5">
+                  </span>
+                </button>
+              </div>
+
+              <!-- Status badge -->
+              <div class="mt-3 pt-3 border-t border-white/5 flex items-center gap-2">
+                <span id="admitStatusDot" class="size-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span id="admitStatusLabel" class="text-xs text-slate-400 font-medium">
+                  Lobby <strong class="text-emerald-400">enabled</strong> — participants must be admitted
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Info note -->
+          <div class="mt-4 bg-[#3c4043]/50 border border-white/5 rounded-xl px-4 py-3 flex gap-3">
+            <svg class="size-4 text-slate-500 shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+            <p class="text-xs text-slate-500 leading-relaxed">Changes apply instantly. Only the host can change these settings.</p>
+          </div>
+        </div>
+
+
+
+      </div>
+    </aside>
+
+
+  </main>
+
+  <div id="leaveModal"
+    class="hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#202124] border border-white/10 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl">
+      <h3 class="text-xl font-bold text-white mb-4">Leave Meeting?</h3>
+
+      <div id="hostOptions" class="hidden flex-col gap-3 mb-4">
+        <button id="endCallBtn"
+          class="w-full bg-[#ea4335] hover:bg-[#d93025] text-white py-2.5 rounded-xl font-semibold shadow-md transition-all">End
+          Call for Everyone</button>
+        <button id="leaveOnlyBtn"
+          class="w-full bg-[#3c4043] hover:bg-[#4a4d51] text-white py-2.5 rounded-xl font-semibold transition-all">Leave
+          Meeting (Keep active)</button>
+      </div>
+
+      <div id="guestOptions" class="hidden flex-col gap-3 mb-4">
+        <button id="confirmLeaveBtn"
+          class="w-full bg-[#ea4335] hover:bg-[#d93025] text-white py-2.5 rounded-xl font-semibold shadow-md transition-all">Yes,
+          Leave</button>
+      </div>
+
+      <button id="cancelLeaveBtn"
+        class="w-full text-sm font-medium text-slate-400 hover:text-white py-2 transition-all">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ══ LOBBY WAITING SCREEN (shown to participants before host admits) ══ -->
+  <div id="lobbyWaitingScreen"
+    class="hidden fixed inset-0 z-[115] bg-[#202124] flex flex-col items-center justify-center px-4 text-center">
+
+    <!-- Animated avatar ring -->
+    <div class="relative flex items-center justify-center mb-8">
+      <div class="lobby-pulse relative size-24 rounded-full bg-gradient-to-br from-[#8ab4f8]/30 to-[#8ab4f8]/10 border border-[#8ab4f8]/30 flex items-center justify-center">
+        <svg class="size-10 text-[#8ab4f8]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+        </svg>
+      </div>
+    </div>
+
+    <h2 class="text-2xl font-bold text-white mb-2">Waiting to be admitted</h2>
+    <p id="lobbyMeetingNameText" class="text-slate-400 mb-6 text-sm max-w-xs">The host will let you in soon.</p>
+
+    <!-- Animated dots -->
+    <div class="flex items-center gap-2 mb-10">
+      <div class="bounce-dot size-2 rounded-full bg-[#8ab4f8]"></div>
+      <div class="bounce-dot size-2 rounded-full bg-[#8ab4f8]"></div>
+      <div class="bounce-dot size-2 rounded-full bg-[#8ab4f8]"></div>
+    </div>
+
+    <!-- Status label -->
+    <div id="lobbyStatusText" class="text-xs text-slate-500 bg-[#28292c] border border-white/10 px-4 py-2 rounded-full font-medium mb-8">
+      Waiting for host to admit you…
+    </div>
+
+    <!-- Leave lobby button -->
+    <button id="leaveLobbyBtn"
+      class="bg-[#3c4043] hover:bg-[#4a4d51] text-white px-7 py-2.5 rounded-full text-sm font-semibold transition-colors border border-white/10 shadow-sm">
+      Leave
+    </button>
+  </div>
+
+  <!-- ══ HOST KNOCK NOTIFICATION (bottom-right corner popup) ══════════════ -->
+  <div id="knockNotification"
+    class="hidden fixed bottom-28 right-6 z-[130] w-80 bg-[#28292c] border border-[#8ab4f8]/30 rounded-2xl shadow-2xl p-4 transition-all duration-300 transform translate-y-4 opacity-0">
+    <div class="flex items-start gap-3">
+      <div class="shrink-0 size-10 rounded-full bg-[#8ab4f8]/10 border border-[#8ab4f8]/20 flex items-center justify-center">
+        <svg class="size-5 text-[#8ab4f8]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-xs text-slate-400 mb-0.5 font-medium">Someone wants to join</p>
+        <p id="knockPersonName" class="text-sm font-bold text-white truncate"></p>
+        <p id="knockPersonEmail" class="text-xs text-slate-500 truncate"></p>
+      </div>
+      <button id="knockDismissBtn" class="shrink-0 p-1 rounded-full hover:bg-white/10 text-slate-500 hover:text-white transition-colors">
+        <svg class="size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+    <div class="flex gap-2 mt-3">
+      <button id="knockDenyBtn"
+        class="flex-1 py-2 rounded-xl bg-[#3c4043] hover:bg-rose-500/20 hover:border-rose-500/40 hover:text-rose-400 text-slate-300 text-xs font-bold transition-all border border-white/10">
+        Deny
+      </button>
+      <button id="knockAdmitBtn"
+        class="flex-1 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 text-xs font-bold transition-colors shadow-sm">
+        Admit
+      </button>
+    </div>
+    <p class="text-center text-[10px] text-slate-600 mt-2">
+      <button id="viewAllWaitingBtn" class="hover:text-slate-400 transition-colors underline underline-offset-2">View all waiting →</button>
+    </p>
+  </div>
+
+  <div id="toastNotification"
+    class="fixed top-6 left-1/2 transform -translate-x-1/2 z-[120] bg-white text-slate-900 px-6 py-3 rounded-lg shadow-2xl transition-all duration-300 opacity-0 pointer-events-none -translate-y-10 border border-slate-200 flex items-center gap-3 whitespace-nowrap font-medium">
+    <svg class="size-5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </svg>
+    <span id="toastMessage" class="text-sm"></span>
+  </div>
+
+  <div id="postCallScreen"
+    class="hidden fixed inset-0 z-[110] bg-[#202124] flex flex-col items-center justify-center px-4 text-center">
+    <div class="size-16 rounded-full bg-[#3c4043] flex items-center justify-center mb-6 shadow-sm">
+      <svg class="size-8 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <polyline points="16 17 21 12 16 7"></polyline>
+        <line x1="21" y1="12" x2="9" y2="12"></line>
+      </svg>
+    </div>
+    <h2 class="text-3xl font-bold text-white mb-2" id="postCallTitle">You left the meeting</h2>
+    <p class="text-slate-400 mb-8" id="postCallSubtitle">The meeting is still ongoing.</p>
+
+    <div class="flex flex-col w-full sm:w-auto sm:flex-row gap-4">
+      <button id="rejoinBtn"
+        class="bg-[#8ab4f8] hover:bg-[#aecbfa] text-slate-900 px-8 py-3 rounded-full font-bold shadow-md transition-all hidden">Rejoin
+        Meeting</button>
+      <button id="goHomeBtn"
+        class="bg-[#3c4043] hover:bg-[#4a4d51] text-white px-8 py-3 rounded-full font-bold shadow-sm transition-all">Go
+        to Home Page</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+  <script src="script.js"></script>
+
+  
+</body>
+
+</html>

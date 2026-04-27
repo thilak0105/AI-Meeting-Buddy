@@ -1,0 +1,31 @@
+{
+  "name": "combined-meet",
+  "version": "2.0.0",
+  "description": "Combined AI-powered video conference app with MongoDB tracking and ngrok support",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start-server": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "video",
+    "conference",
+    "webrtc",
+    "ai",
+    "mongodb"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^17.2.3",
+    "express": "^4.19.2",
+    "groq-sdk": "^0.37.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.20.1",
+    "openai": "^6.9.1",
+    "socket.io": "^4.8.1"
+  }
+}
