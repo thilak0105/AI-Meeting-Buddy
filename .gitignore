@@ -1,20 +1,28 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
 # Dependencies
-**/node_modules/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Environment and secrets
-**/.env
-**/.env.*
+# Runtime files
+uploads/
+ngrok_url.txt
 
-# Logs
-**/npm-debug.log*
-**/yarn-debug.log*
-**/yarn-error.log*
-**/*.log
-
-# Runtime/uploads
-Meeting-Engine/uploads/
-
-# OS/editor files
+# OS
 .DS_Store
 Thumbs.db
+
+# IDE
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
