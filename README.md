@@ -17,8 +17,8 @@
 <br/>
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
-[![MongoDB](https://img.shields.io/badge/MongoDB-8.x-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8.20-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io)
 [![Groq](https://img.shields.io/badge/Groq-LLaMA_3.3_70B-F55036?style=for-the-badge&logo=meta&logoColor=white)](https://groq.com)
 [![WebRTC](https://img.shields.io/badge/WebRTC-P2P_Video-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org)
 [![License](https://img.shields.io/badge/License-ISC-0ea5e9?style=for-the-badge)](./LICENSE)
@@ -302,42 +302,6 @@ All endpoints are prefixed with `/api`. Protected routes require a valid `authTo
 | `PUT` | `/api/objectives/current` | Manager | Edit objectives manually |
 
 </details>
-
-<br/>
-
-## ⚡ Socket.IO Event Map
-
-```
-  CLIENT ──────────────────────────────────────► SERVER
-  ─────────────────────────────────────────────────────────────────
-  join-meeting        Authenticate & enter a meeting room
-  admit-user          Host admits a waiting lobby participant
-  deny-user           Host denies a lobby participant
-  offer               WebRTC connection offer (P2P signalling)
-  answer              WebRTC connection answer
-  ice-candidate       WebRTC ICE candidate exchange
-  media-state         Broadcast mute / camera state changes
-  chat-message        Send in-meeting text chat
-  emoji-reaction      Broadcast emoji reaction overlay
-  audio-chunk         Stream raw audio for Whisper transcription
-  host-mute-all       Mute all participants in the room
-  host-camera-off-all Turn off cameras for all participants
-  host-mute-participant     Target-mute a single participant
-  host-camera-off-participant  Target camera-off a participant
-  end-meeting         End meeting & trigger transcript finalisation
-  transfer-host       Transfer host role (e.g. on disconnect)
-  screenshare-state   Broadcast screen share start/stop
-
-  SERVER ──────────────────────────────────────► CLIENT
-  ─────────────────────────────────────────────────────────────────
-  meeting-settings    Room config sent on join
-  lobby-user-waiting  New participant waiting for admission
-  placed-in-lobby     Participant told they are in the lobby
-  admitted-to-meeting Participant granted room access
-  denied-from-meeting Participant denied room access
-  join-error          Error during join (e.g. meeting not found)
-```
-
 <br/>
 
 ## 🗄️ Data Models
@@ -371,6 +335,18 @@ All endpoints are prefixed with `/api`. Protected routes require a valid `authTo
 *`GROQ_API_KEY` is required unless both `GROQ_AUDIO_API_KEY` and `GROQ_SUMMARY_API_KEY` are explicitly set.
 
 <br/>
+
+---
+---
+
+## Contributors
+
+| Name | GitHub |
+|---|---|
+| Thilak L | [@thilak0105](https://github.com/thilak0105) |
+| Loganand S | [@loganand612](https://github.com/loganand612) |
+| Subramanian G | [@Demoncyborg07](https://github.com/Demoncyborg07) |
+| Raghul A R | [@a-steel-heart](https://github.com/a-steel-heart) |
 
 ---
 
