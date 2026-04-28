@@ -1,200 +1,381 @@
-# AI Meeting Buddy
+<div align="center">
 
-AI-Meeting-Buddy is a full-stack meeting platform focused on real-time collaboration with AI-powered transcript processing and post-meeting intelligence.
+<br/>
 
-## Features
+```
+ █████╗ ██╗    ███╗   ███╗███████╗███████╗████████╗██╗███╗   ██╗ ██████╗
+██╔══██╗██║    ████╗ ████║██╔════╝██╔════╝╚══██╔══╝██║████╗  ██║██╔════╝
+███████║██║    ██╔████╔██║█████╗  █████╗     ██║   ██║██╔██╗ ██║██║  ███╗
+██╔══██║██║    ██║╚██╔╝██║██╔══╝  ██╔══╝     ██║   ██║██║╚██╗██║██║   ██║
+██║  ██║██║    ██║ ╚═╝ ██║███████╗███████╗   ██║   ██║██║ ╚████║╚██████╔╝
+╚═╝  ╚═╝╚═╝    ╚═╝     ╚═╝╚══════╝╚══════╝   ╚═╝   ╚═╝╚═╝  ╚═══╝ ╚═════╝
+                              B U D D Y
+```
 
-- 🎥 Real-time WebRTC video/audio conferencing
-- 📝 Automatic transcript generation with Groq/OpenAI
-- 👥 Participant tracking and engagement scoring
-- 📊 Meeting summaries and task extraction
-- 🔐 Role-based access (manager/employee)
-- 🗄️ MongoDB-backed persistence
-- 🔗 ngrok tunnel support for public URLs
-- 🤖 Face detection for engagement metrics
+### AI-powered video meetings · Live transcription · Smart summaries · Task extraction
 
-## Tech Stack
+<br/>
 
-- **Backend:** Node.js, Express, Socket.IO
-- **Database:** MongoDB, Mongoose
-- **Frontend:** HTML5, CSS3, JavaScript
-- **AI:** Groq SDK, OpenAI API
-- **WebRTC:** Peer-to-peer video/audio
-- **Authentication:** JWT, bcryptjs
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8.x-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://mongodb.com)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.x-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io)
+[![Groq](https://img.shields.io/badge/Groq-LLaMA_3.3_70B-F55036?style=for-the-badge&logo=meta&logoColor=white)](https://groq.com)
+[![WebRTC](https://img.shields.io/badge/WebRTC-P2P_Video-333333?style=for-the-badge&logo=webrtc&logoColor=white)](https://webrtc.org)
+[![License](https://img.shields.io/badge/License-ISC-0ea5e9?style=for-the-badge)](./LICENSE)
 
-## Prerequisites
+</div>
 
-- Node.js 18+ (recommended)
-- npm 9+
-- MongoDB instance (local or cloud)
-- Groq/OpenAI API keys (for AI features)
+---
 
-## Installation
+## What is AI Meeting Buddy?
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd AI-Meeting-Buddy
-   ```
+**AI Meeting Buddy** is a self-hosted, full-stack web application that merges browser-native video conferencing with an AI intelligence layer. Teams hold meetings, capture live audio transcripts, and instantly convert them into structured summaries and Kanban-style project tasks — all without leaving the browser, and without depending on any third-party meeting platform.
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+<br/>
 
-3. **Create `.env` file:**
-   ```
-   MONGO_URI=mongodb://username:password@localhost:27017/ai-meeting-buddy?authSource=admin
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-   PORT=5000
-   GROQ_API_KEY=your-groq-api-key
-   GROQ_SUMMARY_API_KEY=your-groq-summary-key
-   KEEP_AUDIO_FILES=false
-   ```
+## ✦ Features
 
-4. **Seed test users (optional):**
-   ```bash
-   node seed-users.js
-   ```
-   
-   Default test credentials:
-   - **Managers:** `manager1@company.com` / `Manager@123`
-   - **Employees:** `employee1@company.com` / `Employee@123`
+<table>
+<tr>
+<td width="50%" valign="top">
 
-## Running the Application
+**🎥 Real-Time Video & Audio**
+Browser-native WebRTC with peer-to-peer connections. No plugins, no downloads.
 
-1. **Start the server:**
-   ```bash
-   npm start
-   ```
+**🔐 Role-Based Access Control**
+Managers create and control meetings. Employees join via a shareable link. Every route is JWT-protected.
 
-2. **Open in browser:**
-   ```
-   http://localhost:5000
-   ```
+**🚪 Lobby & Admission**
+Participants wait in a lobby — the host reviews and admits or denies each person individually.
 
-## MongoDB Setup
+**🎙️ Live Transcription**
+Audio chunks stream to the server and are transcribed in real-time using Groq's Whisper API.
 
-### Option 1: Local MongoDB with Authentication
+</td>
+<td width="50%" valign="top">
+
+**🤖 AI Summaries**
+LLaMA 3.3 70B processes transcripts into rich, structured HTML meeting summaries.
+
+**✅ Kanban Task Extraction**
+AI extracts actionable tasks from transcripts and organises them into a to-do / in-progress / done board.
+
+**📊 Project Intelligence**
+Summaries across multiple meetings are merged into a single per-project view with an objectives tracker.
+
+**🎛️ Host Controls**
+Mute all, camera off all, per-participant controls, screen-share coordination, and live host transfer.
+
+</td>
+</tr>
+</table>
+
+<br/>
+
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                         Browser Client                        │
+│                                                              │
+│   index.html        meeting.html          dashboard.html     │
+│   (Login)           (Video + Chat +       (History, Tasks,   │
+│                      Transcription)        Summaries)        │
+└─────────────────────────┬────────────────────────────────────┘
+                          │  HTTP REST  +  WebSocket (Socket.IO)
+┌─────────────────────────▼────────────────────────────────────┐
+│                    server.js  (Express)                       │
+│                                                              │
+│   ┌──────────────┐   ┌──────────────┐   ┌────────────────┐  │
+│   │   REST API   │   │  Socket.IO   │   │  AI Pipeline   │  │
+│   │  /api/...    │   │  Signalling  │   │ Whisper+LLaMA  │  │
+│   └──────┬───────┘   └──────┬───────┘   └───────┬────────┘  │
+│          │                  │                    │           │
+│   ┌──────▼──────────────────▼────────────────────▼────────┐  │
+│   │                 Mongoose ODM                           │  │
+│   │   Users · Meetings · Transcripts · Summaries · Tasks  │  │
+│   └───────────────────────────────────────────────────────┘  │
+└─────────────────────────┬────────────────────────────────────┘
+                          │  Groq API
+         ┌────────────────┴──────────────┐
+         ▼                               ▼
+   Groq Whisper                    Groq LLaMA 3.3 70B
+   (Transcription)                 (Summarisation + Tasks)
+```
+
+<br/>
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Role |
+|---|---|---|
+| Runtime | Node.js 18+ | Server-side JavaScript |
+| Framework | Express 4 | HTTP routing & middleware |
+| Real-time | Socket.IO 4 | WebRTC signalling & live events |
+| Database | MongoDB + Mongoose 8 | Persistence & ODM |
+| Frontend | HTML5 / CSS3 / Vanilla JS | Zero-dependency browser UI |
+| AI — Audio | Groq Whisper | Real-time speech-to-text |
+| AI — Text | Groq LLaMA 3.3 70B | Summarisation & task extraction |
+| Video | WebRTC (browser-native) | Peer-to-peer video & audio |
+| Auth | JWT + bcryptjs | httpOnly cookie sessions |
+
+<br/>
+
+## 📁 Project Structure
+
+```
+ai-meeting-buddy/
+│
+├── server.js                      ← Express app, Socket.IO, all API routes, AI logic
+│
+├── index.html                     ← Login / landing page
+├── meeting.html                   ← In-meeting UI (video grid, chat, transcript, controls)
+├── script.js                      ← Meeting client (WebRTC, Socket.IO, audio streaming)
+│
+├── dashboard.html                 ← Dashboard (history, summaries, tasks, objectives)
+├── dashboard.js                   ← Dashboard client logic
+│
+├── models/                        ← face-api.js model weights
+│   ├── tiny_face_detector_model-*
+│   └── face_landmark_68_tiny_model-*
+│
+├── seed-users.js                  ← Seed test manager & employee accounts
+├── create-mongo-user.js           ← Helper to create a MongoDB auth user
+├── fix-mongodb-auth.js            ← Repair MongoDB auth config
+├── verify-transcript-*.js         ← Transcript storage verification scripts
+│
+├── MONGODB_SETUP.md               ← MongoDB authentication setup guide
+└── package.json
+```
+
+<br/>
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+
+- **MongoDB** running locally or on [Atlas](https://www.mongodb.com/atlas)
+- A **[Groq API key](https://console.groq.com/)** — free tier available
+
+---
+
+### 1 · Clone the repository
 
 ```bash
-node create-mongo-user.js
+git clone -b feature/my-changes https://github.com/thilak0105/AI-Meeting-Buddy.git
+cd AI-Meeting-Buddy
 ```
 
-This creates a user `meetinguser` with password `meeting123`.
-
-### Option 2: MongoDB Atlas (Cloud)
-
-Use your Atlas connection string in `.env`:
-```
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/ai-meeting-buddy
-```
-
-### Option 3: Verify Connection
+### 2 · Install dependencies
 
 ```bash
-node fix-mongodb-auth.js
+npm install
 ```
 
-## API Endpoints
+### 3 · Create your `.env` file
 
-### Authentication
-- `POST /api/auth/login` — User login
-- `POST /api/auth/logout` — User logout
+```env
+# ── Database ──────────────────────────────────────────────────────
+MONGO_URI=mongodb://localhost:27017/Meeting
 
-### Meetings
-- `GET /api/meetings` — Get all meetings
-- `POST /api/meetings` — Create new meeting
-- `GET /api/meetings/:meetingId` — Get meeting details
+# ── Auth ──────────────────────────────────────────────────────────
+JWT_SECRET=replace-me-with-a-long-random-string
 
-### Participants
-- `POST /api/participants` — Track participant join/leave
-- `GET /api/participants/:meetingId` — Get meeting participants
+# ── Groq AI ───────────────────────────────────────────────────────
+# Option A: single key (simpler)
+GROQ_API_KEY=gsk_...
 
-### Summaries
-- `POST /api/summaries` — Save meeting summary
-- `GET /api/summaries` — Get all summaries
-- `GET /api/summaries/:meetingId` — Get summary by meeting ID
+# Option B: split keys for higher throughput (recommended)
+GROQ_AUDIO_API_KEY=gsk_...        # used by Whisper for transcription
+GROQ_SUMMARY_API_KEY=gsk_...      # used by LLaMA for summarisation
 
-### System
-- `GET /api/test` — API connectivity test
-- `GET /api/check-connection` — MongoDB connection status
-- `GET /api/ngrok` — Get ngrok public URL
+# Optional
+GROQ_TEXT_MODEL=llama-3.3-70b-versatile
+KEEP_AUDIO_FILES=false
 
-## Project Structure
-
-```
-├── server.js                    # Main Express server
-├── package.json                 # Dependencies
-├── index.html                   # Landing page
-├── meeting.html                 # Meeting interface
-├── dashboard.html               # Dashboard UI
-├── script.js                    # Frontend JavaScript
-├── dashboard.js                 # Dashboard logic
-├── models/                      # ML models (face detection)
-├── seed-users.js                # Test user seeding
-├── create-mongo-user.js         # MongoDB user creation
-├── fix-mongodb-auth.js          # MongoDB auth debugging
-├── MONGODB_SETUP.md             # Database setup guide
-└── verify-transcript-*.js       # Transcript verification scripts
+# ── Server ────────────────────────────────────────────────────────
+PORT=5000
 ```
 
-## Environment Variables
+> [!TIP]
+> Using two separate Groq API keys (`GROQ_AUDIO_API_KEY` and `GROQ_SUMMARY_API_KEY`) splits the transcription and summarisation workloads across independent rate-limit buckets. This prevents throttling during active meetings where both features run simultaneously.
+
+> [!WARNING]
+> **Always** replace `JWT_SECRET` before deploying. The default value `dev-secret-change-me` is intentionally insecure and must never be used in production.
+
+### 4 · Configure MongoDB
+
+If your MongoDB instance requires authentication, follow the step-by-step guide in [MONGODB_SETUP.md](./MONGODB_SETUP.md).
+
+### 5 · Seed test accounts *(optional but recommended)*
+
+```bash
+node seed-users.js
+```
+
+### 6 · Start the server
+
+```bash
+npm start
+# → App running at http://localhost:5000
+```
+
+<br/>
+
+## 👥 Default Test Accounts
+
+After running `seed-users.js` you can log in immediately with:
+
+| Role | Email | Password |
+|---|---|---|
+| 👔 Manager | `manager1@company.com` | `Manager@123` |
+| 👔 Manager | `manager2@company.com` | `Manager@123` |
+| 🧑‍💻 Employee | `employee1@company.com` | `Employee@123` |
+| 🧑‍💻 Employee | `employee2@company.com` | `Employee@123` |
+| 🧑‍💻 Employee | `employee3@company.com` | `Employee@123` |
+
+<br/>
+
+## 📡 API Reference
+
+All endpoints are prefixed with `/api`. Protected routes require a valid `authToken` httpOnly cookie.
+
+<details>
+<summary><b>🔑 Authentication</b></summary>
+<br/>
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Public | Login and receive JWT cookie |
+| `POST` | `/api/auth/logout` | Auth | Clear auth cookie |
+| `GET` | `/api/auth/me` | Auth | Get current user info |
+| `POST` | `/api/auth/users` | Manager | Create a new user account |
+
+</details>
+
+<details>
+<summary><b>📅 Meetings</b></summary>
+<br/>
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/meetings` | Manager | Create a new meeting |
+| `GET` | `/api/meetings/history` | Auth | List meetings for the current user |
+| `GET` | `/api/meetings/:meetingId` | Auth | Get meeting details |
+| `POST` | `/api/meetings/:meetingId/transcript` | Manager | Save / overwrite full transcript |
+| `POST` | `/api/meetings/:meetingId/save-transcript` | Auth | Persist live transcript chunks |
+| `POST` | `/api/meetings/:meetingId/reprocess-audio` | Manager | Re-run Whisper on stored audio |
+
+</details>
+
+<details>
+<summary><b>🤖 Summaries</b></summary>
+<br/>
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/generate-summary` | Auth | Generate AI summary from transcript |
+| `GET` | `/api/summaries/:meetingId` | Auth | Get summary for a meeting |
+| `GET` | `/api/meeting-summaries` | Manager | List all meeting summaries |
+| `POST` | `/api/participants` | Auth | Record a participant join event |
+| `GET` | `/api/participants/:meetingId` | Auth | List participants for a meeting |
+
+</details>
+
+<details>
+<summary><b>📊 Projects, Tasks & Objectives</b></summary>
+<br/>
+
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/project-summary/process` | Auth | Merge transcripts → project summary + tasks |
+| `GET` | `/api/project-summary/:projectName` | Auth | Get project-level summary |
+| `GET` | `/api/project-summaries` | Manager | List all project summaries |
+| `GET` | `/api/project-tasks` | Manager | List all tasks across projects |
+| `GET` | `/api/project-tasks/:projectName` | Auth | Get tasks for a project |
+| `POST` | `/api/project-tasks` | Manager | Create a task manually |
+| `PATCH` | `/api/project-tasks/:taskId` | Manager | Update task status or details |
+| `DELETE` | `/api/project-tasks/:taskId` | Manager | Delete a task |
+| `GET` | `/api/objectives/current` | Manager | Get current objectives board |
+| `POST` | `/api/objectives/refresh` | Manager | Rebuild objectives from recent transcripts |
+| `PUT` | `/api/objectives/current` | Manager | Edit objectives manually |
+
+</details>
+
+<br/>
+
+## ⚡ Socket.IO Event Map
+
+```
+  CLIENT ──────────────────────────────────────► SERVER
+  ─────────────────────────────────────────────────────────────────
+  join-meeting        Authenticate & enter a meeting room
+  admit-user          Host admits a waiting lobby participant
+  deny-user           Host denies a lobby participant
+  offer               WebRTC connection offer (P2P signalling)
+  answer              WebRTC connection answer
+  ice-candidate       WebRTC ICE candidate exchange
+  media-state         Broadcast mute / camera state changes
+  chat-message        Send in-meeting text chat
+  emoji-reaction      Broadcast emoji reaction overlay
+  audio-chunk         Stream raw audio for Whisper transcription
+  host-mute-all       Mute all participants in the room
+  host-camera-off-all Turn off cameras for all participants
+  host-mute-participant     Target-mute a single participant
+  host-camera-off-participant  Target camera-off a participant
+  end-meeting         End meeting & trigger transcript finalisation
+  transfer-host       Transfer host role (e.g. on disconnect)
+  screenshare-state   Broadcast screen share start/stop
+
+  SERVER ──────────────────────────────────────► CLIENT
+  ─────────────────────────────────────────────────────────────────
+  meeting-settings    Room config sent on join
+  lobby-user-waiting  New participant waiting for admission
+  placed-in-lobby     Participant told they are in the lobby
+  admitted-to-meeting Participant granted room access
+  denied-from-meeting Participant denied room access
+  join-error          Error during join (e.g. meeting not found)
+```
+
+<br/>
+
+## 🗄️ Data Models
+
+| Model | Description |
+|---|---|
+| `User` | Manager and employee accounts with bcrypt-hashed passwords |
+| `Meeting` | Metadata, status (`active` / `ended` / `dropped`), and consolidated transcript |
+| `MeetingParticipant` | Per-participant join/leave timestamps and host flag |
+| `TranscriptChunk` | Individual speaker utterances with millisecond-level timestamps |
+| `MeetingSummary` | AI-generated HTML summary per meeting |
+| `ProjectSummary` | Merged cross-meeting summary per project name |
+| `ProjectTask` | Kanban tasks extracted from transcripts (`todo` · `in_progress` · `done`) |
+| `ManagerObjective` | Per-manager to-start / ongoing objectives board |
+
+<br/>
+
+## 🔑 Environment Variables
 
 | Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `MONGO_URI` | Yes | `mongodb://localhost:27017/Meeting` | MongoDB connection string |
-| `JWT_SECRET` | Yes | N/A | Secret key for JWT signing |
-| `PORT` | No | `5000` | Server port |
-| `GROQ_API_KEY` | No | N/A | Groq API key for audio/text |
-| `GROQ_AUDIO_API_KEY` | No | Uses `GROQ_API_KEY` | Separate key for audio transcription |
-| `GROQ_SUMMARY_API_KEY` | No | Uses `GROQ_API_KEY` | Separate key for summaries |
-| `GROQ_TEXT_MODEL` | No | `llama-3.3-70b-versatile` | Groq model for text processing |
-| `KEEP_AUDIO_FILES` | No | `false` | Keep audio files after processing |
+|---|---|---|---|
+| `MONGO_URI` | No | `mongodb://localhost:27017/Meeting` | MongoDB connection string |
+| `JWT_SECRET` | **Yes** | `dev-secret-change-me` | JWT signing secret — **must be changed** |
+| `GROQ_API_KEY` | **Yes*** | — | Fallback Groq key for all AI calls |
+| `GROQ_AUDIO_API_KEY` | No | → `GROQ_API_KEY` | Dedicated key for Whisper transcription |
+| `GROQ_SUMMARY_API_KEY` | No | → `GROQ_API_KEY` | Dedicated key for LLM summarisation |
+| `GROQ_TEXT_MODEL` | No | `llama-3.3-70b-versatile` | Groq model for summaries and tasks |
+| `KEEP_AUDIO_FILES` | No | `false` | Retain raw audio chunks after transcription |
+| `PORT` | No | `5000` | HTTP server port |
 
-## Development
+*`GROQ_API_KEY` is required unless both `GROQ_AUDIO_API_KEY` and `GROQ_SUMMARY_API_KEY` are explicitly set.
 
-### Adding New Features
+<br/>
 
-1. Create new endpoints in `server.js`
-2. Update corresponding MongoDB schemas if needed
-3. Add frontend logic in `script.js` or `dashboard.js`
-4. Test with Socket.IO events
+---
 
-### Running Verification Scripts
+<div align="center">
 
-```bash
-# Verify transcript storage
-node verify-transcript-storage.js
+Built with ♥ using &nbsp;**Node.js** · **Socket.IO** · **MongoDB** · **Groq AI** · **WebRTC**
 
-# Verify multi-person transcripts
-node verify-transcript-multi-person.js
-```
-
-## Troubleshooting
-
-### MongoDB Authentication Error
-```
-Command find requires authentication
-```
-**Solution:** Ensure `MONGO_URI` includes credentials and `.env` file exists.
-
-### Cannot Connect to MongoDB
-```
-MongoDB connection error
-```
-**Solution:** Verify MongoDB is running and check connection string in `.env`.
-
-### ngrok URL Errors
-Update `ngrok_url.txt` with your current ngrok tunnel:
-```
-https://your-ngrok-domain.ngrok.io
-```
-
-## License
-
-ISC
-
-## Support
-
-For issues or questions, please open a GitHub issue or contact the development team.
+</div>
